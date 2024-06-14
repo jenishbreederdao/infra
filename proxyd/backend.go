@@ -162,6 +162,9 @@ type Backend struct {
 	networkRequestsSlidingWindow *sw.AvgSlidingWindow
 	networkErrorsSlidingWindow   *sw.AvgSlidingWindow
 
+	blockHeightZeroSlidingWindow       *sw.AvgSlidingWindow
+	blockHeightZeroSlidingWindowLength time.Duration
+
 	weight int
 }
 
@@ -273,11 +276,29 @@ func WithMaxErrorRateThreshold(maxErrorRateThreshold float64) BackendOpt {
 	}
 }
 
+func WithBlockHeightZeroSlidingWindow(sw *sw.AvgSlidingWindow) BackendOpt {
+	return func(b *Backend) {
+		b.blockHeightZeroSlidingWindow = sw
+	}
+}
+
 func WithConsensusReceiptTarget(receiptsTarget string) BackendOpt {
 	return func(b *Backend) {
 		b.receiptsTarget = receiptsTarget
 	}
 }
+
+func WithBlockHeightZeroSlidingWindowLength(time time.Duration) BackendOpt {
+	return func(b *Backend) {
+		b.blockHeightZeroSlidingWindowLength = time
+	}
+}
+
+// func WithBlockHeightZeroClock(sw *sw.AvgSlidingWindow) BackendOpt {
+// 	return func(b *Backend) {
+// 		b.blockHeightZeroSlidingWindow = sw
+// 	}
+// }
 
 type indexedReqRes struct {
 	index int
@@ -331,6 +352,10 @@ func NewBackend(
 		latencySlidingWindow:         sw.NewSlidingWindow(),
 		networkRequestsSlidingWindow: sw.NewSlidingWindow(),
 		networkErrorsSlidingWindow:   sw.NewSlidingWindow(),
+
+		// NOTE: default use the block height sliding window 1 min,
+		// we can override later in backend opts
+		blockHeightZeroSlidingWindowLength: 1 * time.Minute,
 	}
 
 	backend.Override(opts...)
@@ -339,7 +364,18 @@ func NewBackend(
 		log.Warn("proxied requests' XFF header will not contain the proxyd ip address")
 	}
 
+	backend.blockHeightZeroSlidingWindow = sw.NewSlidingWindow(
+		sw.WithWindowLength(backend.blockHeightZeroSlidingWindowLength),
+	)
 	return backend
+}
+
+func (b *Backend) GetBlockHeightZeroSlidingWindowLength() time.Duration {
+	return b.blockHeightZeroSlidingWindowLength
+}
+
+func (b *Backend) GetBlockHeightZeroSlidingWindowCount() uint {
+	return b.blockHeightZeroSlidingWindow.Count()
 }
 
 func (b *Backend) Override(opts ...BackendOpt) {
@@ -673,6 +709,11 @@ func (b *Backend) ErrorRate() (errorRate float64) {
 		errorRate = b.networkErrorsSlidingWindow.Sum() / b.networkRequestsSlidingWindow.Sum()
 	}
 	return errorRate
+}
+
+// BlockHeightZeroCount returns the amount of infractions in the window
+func (b *Backend) BlockHeightZeroCount() uint {
+	return b.blockHeightZeroSlidingWindow.Count()
 }
 
 // IsDegraded checks if the backend is serving traffic in a degraded state (i.e. used as a last resource)
