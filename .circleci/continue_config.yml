@@ -387,7 +387,7 @@ workflows:
   logging:
     jobs:
       - log-config-results:
-          filters:  # required since `deploy` has tag filters AND requires `build`
+          filters:
             tags:
               only: /.*/
             branches:
@@ -441,9 +441,6 @@ workflows:
           docker_tags: <<pipeline.git.revision>>,<<pipeline.git.branch>>
           docker_context: .
   release:
-    # when:
-    #   not:
-    #     equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
     jobs:
       - log-config-results:
           filters:
@@ -453,7 +450,7 @@ workflows:
               ignore: /.*/
       - hold:
           type: approval
-          filters:  # required since `deploy` has tag filters AND requires `build`
+          filters:
             tags:
               only: /^(proxyd|ufm-[a-z0-9\-]*|op-[a-z0-9\-]*)\/v.*/
             branches:
@@ -468,7 +465,7 @@ workflows:
           docker_context: .
           docker_file: op-ufm/Dockerfile
           context:
-            - oplabs-gcr
+            - oplabs-gcr-release
           requires:
             - hold
       - docker-publish:
@@ -476,7 +473,7 @@ workflows:
           docker_name: op-ufm
           docker_tags: <<pipeline.git.revision>>
           context:
-            - oplabs-gcr
+            - oplabs-gcr-release
           requires:
             - op-ufm-docker-build
       - docker-build:
@@ -489,7 +486,7 @@ workflows:
           docker_context: .
           docker_file: proxyd/Dockerfile
           context:
-            - oplabs-gcr
+            - oplabs-gcr-release
           requires:
             - hold
       - docker-publish:
@@ -500,7 +497,7 @@ workflows:
           docker_name: proxyd
           docker_tags: <<pipeline.git.revision>>
           context:
-            - oplabs-gcr
+            - oplabs-gcr-release
           requires:
             - proxyd-docker-build
 
@@ -513,6 +510,8 @@ workflows:
           docker_name: op-conductor-mon
           docker_tags: <<pipeline.git.revision>>,<<pipeline.git.branch>>
           docker_context: .
+          context:
+            - oplabs-gcr-release
           requires:
             - hold
       - docker-publish:
@@ -520,6 +519,6 @@ workflows:
           docker_name: op-conductor-mon
           docker_tags: <<pipeline.git.revision>>,<<pipeline.git.branch>>
           context:
-            - oplabs-gcr
+            - oplabs-gcr-release
           requires:
             - op-conductor-mon-docker-build
