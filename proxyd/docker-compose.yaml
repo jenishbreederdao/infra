@@ -1,0 +1,29 @@
+services:
+  proxyd:
+    container_name: proxyd
+    build: .
+    ports:
+      - "80:80"
+    volumes:
+      - ./config.toml:/etc/proxyd/proxyd.toml
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    networks:
+      - op-network
+
+  redis:
+    container_name: redis
+    image: redis:7.2-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - ./data:/data
+    networks:
+      - op-network
+
+networks:
+  op-network:
